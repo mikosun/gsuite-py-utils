@@ -19,4 +19,4 @@ GoogleAPIを使用したpythonツールのユーティリティリポジトリ�
   ```git clone  https://github.com/mikosun/gsuite-py-utils.git```
 2. 対象pythonをインストール
 3. 必要なライブラリをインストール(詳細は[公式ドキュメント](https://developers.google.com/workspace/drive/labels/quickstart/python)参照)  
-  ```  pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib```
+  ```pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib```
