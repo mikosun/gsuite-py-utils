@@ -1,74 +1,54 @@
 import os.path
-import sys
+import argparse
 
-from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
-from googleapiclient.http import MediaFileUpload
+from logging import getLogger
+from pathlib import Path
 
-from src.util.enums import FolderName
-from src.util.get_credentials import GetCredentials
-from src.util.get_folder_id import GetFolderId
+from src.util.enums import FolderName, BackupFilePath
+from src.util.drive_files_utils import DriveFilesUtils
 
-# バックアップデータを保存するローカルファイルのパス
-LOCAL_FILE = "../../resource/2026-09-10-21-15-50.zip"
-# LOCAL_FILE = "../../resource/backup_data.txt"
-
-# アップロードするファイルのメタデータを設定
-CHUNK_SIZE = 256 * 1024 * 1024
+# ロガー作成
+logger = getLogger(__name__)
 
 
-def main():
+def main() -> str:
     """
-    Google Drive にファイルをアップロード
+    コマンドライン引数（type）に指定された対象をもとに、Google Drive にファイルをアップロード。
+    対象のGoogle Driveフォルダ内の既存のファイルを削除し、ローカルのバックアップファイルをアップロード。
 
     :return: アップロードされたファイルのID
     """
-    # バックアップするファイルのメタデータを作成
-    file_metadata = {
-        "name": os.path.basename(LOCAL_FILE),
-        "parents": [GetFolderId.get_folder_id(FolderName.STONE_BLOCK4.value)],
-    }
-    # メディアボディを作成
-    media = MediaFileUpload(
-        LOCAL_FILE,
-        mimetype=None,
-        chunksize=CHUNK_SIZE,
-        resumable=True
-    )
+    # コマンドライン引数の解析
+    parser = argparse.ArgumentParser(description="指定した対象に基づき、Google Driveにファイルをアップロードします。")
+    parser.add_argument("type",  # 必須項目
+                        help="アップロード対象のタイプを指定します。[ATM10, STONE_BLOCK4]",
+                        choices=["ATM10", "STONE_BLOCK4"])
+    args = parser.parse_args()
 
-    try:
-        print("INFO: 新規アップロード準備中...")
+    # Typeに応じて、アップロード対象のフォルダの最新版を取得
+    local_file = max(Path(getattr(BackupFilePath, args.type).value).glob("*.zip"),
+                     key=os.path.getmtime,
+                     default=None)
 
-        # Drive v3 API を呼び出し
-        service = build("drive",
-                        "v3",
-                        credentials=GetCredentials.get_credentials())
+    if local_file is None:
+        # フォルダにバックアップファイルが存在しない場合
+        logger.error(f"'{getattr(BackupFilePath, args.type).value}' にバックアップファイルが存在しません。")
+        raise FileNotFoundError(f"'{getattr(BackupFilePath, args.type).value}' にバックアップファイルが存在しません。")
 
-        # アップロードのためのリクエストを作成
-        request = service.files().create(
-            body=file_metadata,
-            media_body=media,
-            fields="id, name"
-        )
+    # Typeに応じて、Google Drive上の対象フォルダの既存ファイル(最新)を削除
+    drive_file_lists = DriveFilesUtils.get_file_list_by_folder_name(getattr(FolderName, args.type).value)
+    if drive_file_lists is not None and len(drive_file_lists) > 0:
+        DriveFilesUtils.delete_file(max(drive_file_lists, key=lambda x: x["name"])["id"])
 
-        # チャンクごとにアップロードを行う
-        print(f"INFO: アップロードを開始します: {LOCAL_FILE}")
-        response = None
-        while response is None:
-            status, response = request.next_chunk()
-            if status:
-                # 進捗率（%）を同じ行に上書き表示
-                progress = int(status.progress() * 100)
-                sys.stdout.write(f"\r進行状況: {progress}% 完了\r")
-                sys.stdout.flush()
+        if len(drive_file_lists) > 1:
+            # 複数のファイルが存在する場合、警告ログを出力
+            logger.warning(
+                f"'{getattr(FolderName, args.type).value}' に複数のファイルが存在しました。最新のファイルを削除しました。")
 
-        print("INFO: アップロード完了！")
-        print(f"INFO: ファイル名: {response.get('name')}")
-        print(f"INFO: ファイルID: {response.get('id')}")
-        return response.get('id')
-
-    except HttpError as error:
-        print(f"An error occurred: {error}")
+    # Google Driveにアップロード
+    return DriveFilesUtils.upload_file(
+        local_file,
+        DriveFilesUtils.get_folder_id(getattr(FolderName, args.type).value))
 
 
 if __name__ == "__main__":
