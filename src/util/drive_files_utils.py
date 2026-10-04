@@ -3,11 +3,10 @@ import sys
 from logging import getLogger
 from pathlib import Path
 
+from google.auth.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaFileUpload
-
-from src.util.get_credentials import GetCredentials
 
 # ロガー作成
 logger = getLogger(__name__)
@@ -18,8 +17,10 @@ class DriveFilesUtils:
     Google Drive のファイル操作に関するユーティリティクラス
     """
 
-    @staticmethod
-    def get_folder_id(folder_name: str) -> str:
+    def __init__(self, credentials: Credentials):
+        self.credentials = credentials
+
+    def get_folder_id(self, folder_name: str) -> str:
         """
         folder_name に対応するフォルダIDを取得。
 
@@ -29,13 +30,11 @@ class DriveFilesUtils:
         # Drive v3 API を呼び出し
         service = build("drive",
                         "v3",
-                        credentials=GetCredentials.get_credentials())
+                        credentials=self.credentials)
 
         # query パラメータを使用して、特定のフォルダ名に一致するフォルダを検索
         # 自分がオーナーのフォルダかつ、引数のフォルダ名
-        query = ("'me' in owners "
-                 "and mimeType='application/vnd.google-apps.folder' "
-                 "and name = '" + folder_name + "'")
+        query = f"mimeType='application/vnd.google-apps.folder' and name = '{folder_name}' and trashed = false"
 
         # files().list メソッドを使用して、フォルダを検索
         result = service.files().list(q=query).execute()
@@ -47,8 +46,7 @@ class DriveFilesUtils:
             logger.info(f"'{folder_name}' のIDを取得しました。")
             return result["files"][0]["id"]
 
-    @staticmethod
-    def get_file_list(folder_id: str) -> list:
+    def get_file_list(self, folder_id: str) -> list:
         """
         指定されたフォルダIDに含まれるファイルのリストを取得。
 
@@ -58,38 +56,43 @@ class DriveFilesUtils:
         # Drive v3 API を呼び出し
         service = build("drive",
                         "v3",
-                        credentials=GetCredentials.get_credentials())
+                        credentials=self.credentials)
 
         # query パラメータを使用して、特定のフォルダIDに含まれるファイルを検索
         query = f"'{folder_id}' in parents and trashed = false"
 
-        # files().list メソッドを使用して、ファイルを検索
-        result = service.files().list(q=query).execute()
+        try:
+            # files().list メソッドを使用して、ファイルを検索
+            result = service.files().list(q=query).execute()
+        except HttpError as error:
+            # API呼び出し自体に失敗した場合（権限エラー、ネットワークエラーなど）
+            logger.error(f"フォルダID '{folder_id}' のファイルリスト取得APIでエラーが発生しました: {error}")
+            raise RuntimeError(f"フォルダID '{folder_id}' のファイルリスト取得APIでエラーが発生しました: {error}")
 
-        if result is None or "files" not in result:
-            # 取得できなかった場合はエラーを返す
-            logger.error(f"フォルダID '{folder_id}' に含まれるファイルが見つかりませんでした。")
-            raise RuntimeError(f"フォルダID '{folder_id}' に含まれるファイルが見つかりませんでした。")
+        # 例外が発生せずにここまで来た場合、result には必ず "files" キーが含まれる（0件の場合は空リスト）
+        files = result.get("files", [])
+
+        if not files:
+            logger.info(f"フォルダID '{folder_id}' は空です（ファイルが存在しません）。")
+            return []
 
         # 取得できた場合
         # ファイルIDとファイル名のリストにmapして返却
-        logger.info(f"フォルダID '{folder_id}' に含まれるファイルのリストを取得しました。")
-        return list(map(lambda f: {"id": f["id"], "name": f["name"]}, result["files"]))
+        logger.info(f"フォルダID '{folder_id}' に含まれるファイルのリストを取得しました。({len(files)}件)")
+        return [{"id": f["id"], "name": f["name"]} for f in files]
 
-    @staticmethod
-    def get_file_list_by_folder_name(folder_name: str) -> list:
+    def get_file_list_by_folder_name(self, folder_name: str) -> list:
         """
         指定されたフォルダ名に含まれるファイルのリストを取得。
 
         :param folder_name: フォルダ名
         :return: ファイルのリスト
         """
-        return DriveFilesUtils.get_file_list(
-            DriveFilesUtils.get_folder_id(folder_name)
+        return self.get_file_list(
+            self.get_folder_id(folder_name)
         )
 
-    @staticmethod
-    def delete_file(file_id: str) -> None:
+    def delete_file(self, file_id: str) -> None:
         """
         指定されたファイルIDのファイルを削除。
 
@@ -98,7 +101,7 @@ class DriveFilesUtils:
         # Drive v3 API を呼び出し
         service = build("drive",
                         "v3",
-                        credentials=GetCredentials.get_credentials())
+                        credentials=self.credentials)
 
         try:
             # files().delete メソッドを使用して、ファイルを削除
@@ -108,8 +111,8 @@ class DriveFilesUtils:
             logger.error(f"ファイルID '{file_id}' のファイルの削除中にエラーが発生しました: {e}")
             raise RuntimeError(f"ファイルID '{file_id}' のファイルの削除中にエラーが発生しました: {e}")
 
-    @staticmethod
-    def upload_file(local_file: Path,
+    def upload_file(self,
+                    local_file: Path,
                     drive_folder_id: str,
                     chunk_size: int = 256 * 1024 * 1024) -> str:
         """
@@ -123,7 +126,7 @@ class DriveFilesUtils:
         # Drive v3 API を呼び出し
         service = build("drive",
                         "v3",
-                        credentials=GetCredentials.get_credentials())
+                        credentials=self.credentials)
 
         try:
             # アップロードのためのリクエストを作成

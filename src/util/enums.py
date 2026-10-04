@@ -1,4 +1,5 @@
-from enum import StrEnum
+from enum import StrEnum, IntEnum
+
 
 class FolderName(StrEnum):
     """
@@ -13,3 +14,10 @@ class BackupFilePath(StrEnum):
     """
     STONE_BLOCK4 = "./ftbbackups3"
     ATM10 = "../bk"
+
+class CredentialsType(IntEnum):
+    """
+    認証情報の種類を定義する列挙型クラス
+    """
+    SERVICE_ACCOUNT = 1
+    USER_ACCOUNT = 2
