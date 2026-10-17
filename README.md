@@ -66,15 +66,15 @@ python -m PyInstaller --onefile src/save_backup_file/save_backup_file.py
 
 ```text
 ROOT_DIR/(任意の名称)
-└── FTB_StoneBlock4/(任意の名称)
-    ├── save_backup_file.exe(本ツール)
-    ├── ftbbackups3/
-        ├── (StoneBlock4のバックアップファイル)
-        └── ...
-    └── ...
-└── ATM10_ServerFiles-7.0/(任意の名称)
-    ├── save_backup_file.exe(本ツール)
-    └── ...
+├── FTB_StoneBlock4/(任意の名称)
+│   ├── save_backup_file.exe(本ツール)
+│   ├── ftbbackups3/
+│   │   ├── (StoneBlock4のバックアップファイル)
+│   │   └── ...
+│   └── ...
+├── ATM10_ServerFiles-7.0/(任意の名称)
+│   ├── save_backup_file.exe(本ツール)
+│   └── ...
 └── bk/
     ├── (ATM10のバックアップファイル)
     └── ...
