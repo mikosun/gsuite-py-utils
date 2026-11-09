@@ -7,17 +7,18 @@ from pathlib import Path
 from src.util.enums import FolderName, BackupFilePath, CredentialsType
 from src.util.drive_files_utils import DriveFilesUtils
 from src.util.get_credentials import CredentialsManager, AuthStrategyFactory
+from src.util.send_notice_discord import send_notice
 
 # ロガー作成
 logger = getLogger(__name__)
 
 
-def main() -> str:
+def main() -> None:
     """
     コマンドライン引数（type）に指定された対象をもとに、Google Drive にファイルをアップロード。
     対象のGoogle Driveフォルダ内の既存のファイルを削除し、ローカルのバックアップファイルをアップロード。
 
-    :return: アップロードされたファイルのID
+    :return: None
     """
     # コマンドライン引数の解析
     parser = argparse.ArgumentParser(description="指定した対象に基づき、Google Driveにファイルをアップロードします。")
@@ -28,6 +29,9 @@ def main() -> str:
                         help="認証情報の種類を指定します。[SERVICE_ACCOUNT, USER_ACCOUNT]",
                         choices=["SERVICE_ACCOUNT", "USER_ACCOUNT"],
                         default="USER_ACCOUNT")
+    parser.add_argument("--discord_channel_id",  # 任意項目)
+                        help="DiscordのチャンネルIDを指定します。指定された場合、アップロード完了後に通知が送信されます。",
+                        default=None)
     args = parser.parse_args()
 
     # Typeに応じて、アップロード対象のフォルダの最新版を取得
@@ -61,9 +65,11 @@ def main() -> str:
                 f"'{getattr(FolderName, args.type).value}' に複数のファイルが存在しました。最新のファイルを削除しました。")
 
     # Google Driveにアップロード
-    return drive_files_utils.upload_file(
-        local_file,
-        drive_folder_id)
+    drive_files_utils.upload_file(local_file, drive_folder_id)
+
+    # アップロード完了通知
+    if args.discord_channel_id is not None:
+        send_notice(args.discord_channel_id, f"{args.type} のバックアップファイルのアップロードが完了しました。")
 
 
 if __name__ == "__main__":

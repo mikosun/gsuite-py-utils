@@ -2,8 +2,6 @@
 
 GoogleAPIを使用したpythonツールのユーティリティリポジトリ。
 
----
-
 ### 動作確認済バージョン
 
 | Category                 | Version |
@@ -46,8 +44,8 @@ GoogleAPIを使用したpythonツールのユーティリティリポジトリ�
 PyInstallerを使用して単一の実行ファイルにビルドします。  
 ※ ファイルは`dist`ディレクトリに生成されます。
 
-```bash
-python -m PyInstaller --onefile src/save_backup_file/save_backup_file.py
+```powershell
+py -m PyInstaller --onefile src/save_backup_file/save_backup_file.py
 ```
 
 #### 使用方法
@@ -90,6 +88,7 @@ ROOT_DIR/(任意の名称)
 * `--credentials_type` (任意): 認証方式を指定します。指定可能な値は `SERVICE_ACCOUNT` または `USER_ACCOUNT` です。  
   ※ 指定しない場合は、デフォルトで `USER_ACCOUNT` が使用されます。  
   ※ `SERVICE_ACCOUNT`はサービスアカウント自体のストレージ容量割り当ての関係上動きません。
+* `--discord_channel_id` (任意): DiscordのチャンネルIDを指定します。指定された場合、アップロード完了後に通知が送信されます。
 
 **実行コマンド例**
 
